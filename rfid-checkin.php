@@ -2,16 +2,16 @@
 
 header("content-type:text/plain");
 include('adodb5/adodb.inc.php');
-$db = NewADOConnection('mysql');                                                
-$db->Connect("localhost", [username], [password], "rfidcheckin");
+$db = NewADOConnection('mysql');
+$db->Connect("localhost", "checkin", "weeeeee", "rfidcheckin");
 if (!$db) {
-    echo "Failed to connect to MySQL.\n";                                           
+    echo "Failed to connect to MySQL.\n";
     exit;
 }
 
-if(strlen($_GET['id']) == 12 ) {
-    if(                                                                                 
-        $db->Execute(                                                                       
+if(array_key_exists('id',$_GET) and strlen($_GET['id']) == 12 ) {
+    if(
+        $db->Execute(
             "INSERT INTO log (timestamp,id) values(NOW(),?)",
             array($_GET['id'])
         ) !== false
@@ -24,12 +24,21 @@ if(strlen($_GET['id']) == 12 ) {
     } else {
         print "ERR\n2\n";
     }
-
+} else if(array_key_exists('report',$_GET)) {
+    switch( $_GET['report'] ) {
+        case 'daily':
+            $res = $db->Execute("select date(timestamp) as day, id from log where dayofyear(timestamp) >= dayofyear(now()) - 30 group by dayofyear(timestamp), id;");
+            if( ! $res ) {
+                print $db->ErrorMsg();
+                die();
+            }
+            while( $row = $res->FetchRow() ) {
+                $data[$row['day']]++;
+            }
+            print json_encode($data);
+            print "\n";
+        break;
+    }
 } else {
     print "ERR\n1\n";
 }
-
-~                                                                               
-~                                                                               
-~                                                                               
-~                            
