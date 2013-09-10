@@ -6,10 +6,9 @@
 #include <EthernetClient.h>
 
 
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xE0, 0xFE, 0xED };
 char server[] = "morphia.mhv";
 
-IPAddress ip(10,0,0,51);
 EthernetClient client;
 
 const int kNetworkTimeout = 30*1000;
@@ -110,11 +109,21 @@ int checkin(const char* asciiID) {
   }
      
   int bodyLen = http.contentLength();
-  if(bodyLen > 255) {
-    
+  if(bodyLen > 255) {          
+    Serial.print("got way more content than we expected: ");
+    Serial.println(bodyLen);
+    lcd.print("ERROR!");
   }
+  
+  char* body;
+  body = (char*)malloc(bodyLen+1);
+  body[bodyLen]=0;
+  
+  char* bodyP = body;
+  
   unsigned long timeoutStart = millis();
   char next_byte;
+  
   while (
     (http.connected() || http.available()) &&
     ((millis() - timeoutStart) < kNetworkTimeout) &&
@@ -122,14 +131,19 @@ int checkin(const char* asciiID) {
   ) {
       if (http.available()) {
           next_byte = http.read();
-          Serial.print(next_byte);
-          lcd.print(next_byte);
+          *bodyP = next_byte;
+          bodyP++;
           bodyLen--;
           timeoutStart = millis();
       } else {
           delay(kNetworkDelay);
       }
   }
+  
+  Serial.print(body);
+  lcd.print(body);
+  
+  free(body);
   http.stop();   
   return http.contentLength();
 }
@@ -176,10 +190,7 @@ void loop()
   }
   
   if( !(2 == count && memcmp(data,idle,2) == 0)) {
-    lcd.clear();
-    lcd.print("HI!");
-    lcd.setCursor(0,1);
-    Serial.print("Recived packet from: ");
+  Serial.print("Recived packet from: ");
     Serial.print(address);
     Serial.print(" of length: ");
     Serial.print(count);
@@ -189,18 +200,14 @@ void loop()
       Serial.print(" ");
       char buffer[4];
       sprintf(buffer,"%02x ",data[i]);
-      lcd.print(buffer);
     }
     Serial.println("");
-    
-    lcd.setCursor(0,2);
-    
     
     if(
       !(last_seen && last_seen_length == count && 
         memcmp( data, last_seen, count ) == 0)
     ) {
-      free(last_seen);
+      if( last_seen ) { free(last_seen); }
       last_seen = (byte*)malloc(count);
       if( last_seen ) {
         last_seen_length = count;
@@ -221,12 +228,23 @@ void loop()
         sprintf(asciiID,"%s%02x",asciiID,data[i]); 
       }
       
-      Serial.println(asciiID);
+      lcd.clear();
+      lcd.print("HI!");
+      lcd.setCursor(0,1);
+      lcd.print(asciiID);
+      lcd.setCursor(0,2);
       checkin(asciiID);
+      
+      Serial.println(asciiID);
       free(asciiID);
+      delay(1000);
     }
-    delay(1000);
+    
+  } else if( last_seen ) { 
     reset_lcd();
+    free(last_seen);
+    last_seen = 0;
+    last_seen_length = 0;
   }
     
 freerfiddata:
