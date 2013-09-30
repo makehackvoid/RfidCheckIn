@@ -37,6 +37,16 @@ if(array_key_exists('id',$_GET) and strlen($_GET['id']) == 12 ) {
             }
             print json_encode($data);
             print "\n";
+        case 'last':
+            $res = $db->Execute("select id from log order by timestamp DESC limit 1;");
+            if( ! $res ) {
+                print $db->ErrorMsg();
+                die();
+            }
+            while( $row = $res->FetchRow() ) {
+                print json_encode(array('last_id_seen' => $row['id']));
+            }
+            print "\n";
         break;
     }
 } else {
