@@ -5,11 +5,12 @@
 #include <HttpClient.h>
 #include <EthernetClient.h>
 
-
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xE0, 0xFE, 0xED };
 char server[] = "morphia.mhv";
 
 EthernetClient client;
+
+int numToday;
 
 const int kNetworkTimeout = 30*1000;
 const int kNetworkDelay = 1000;
@@ -37,7 +38,6 @@ LiquidCrystal lcd(4, 5, 6, 7, 8, 9);
 
 void scan_tone() {
   tone(buzzerPin, 1976, 150); // B6
-  delay(150);
 }
 
 void success_tone() {
@@ -58,16 +58,25 @@ void failure_tone() {
 
 void reset_lcd() {
     lcd.clear();
-    lcd.print("Welcome to:");
+    lcd.setCursor(5,0);
+    lcd.print("Welcome to");
     lcd.setCursor(4,1);
     lcd.print("MakeHackVoid");
-    lcd.setCursor(0,3);    
+    lcd.setCursor(0,2);    
     lcd.print("RFID checkin station");
+    if(numToday > 0) {
+      lcd.setCursor(0,3);
+      lcd.print(numToday);
+      lcd.print(" checkins today");
+    }
 }
 
 void setup() 
 {
   scan_tone();
+  
+  numToday = 0;
+  
   Serial.begin(115200);
   Serial.println("Starting the RFID Checkin thing");
   
@@ -89,6 +98,7 @@ void setup()
   Serial.println("Ready to go!");
   lcd.setCursor(0,3);
   lcd.print("Ready to go!");
+  success_tone();
   delay(1000);
   reset_lcd();
 }
@@ -96,6 +106,7 @@ void setup()
 
 byte* last_seen;
 byte last_seen_length = 0;
+
 
 
 int checkin(const char* asciiID) {
@@ -113,39 +124,42 @@ int checkin(const char* asciiID) {
     free(path);
     Serial.print("Connect failed: ");
     Serial.println(err);
-    return -1;
+    return -2;
   }
   
   free(path);
   
-  if( err = http.responseStatusCode() < 0){          
+  int code = http.responseStatusCode();
+  
+  if( code < 0){          
     Serial.print("Getting response failed: ");
     Serial.println(err);
-    return -1;
+    return -3;
+  } else if(code < 200) {
+    return -4;
+  } else if(code >= 400) {
+    return -5;
   }
   
   if( err = http.skipResponseHeaders() < 0 ) {
     Serial.print("Failed to skip response headers: ");
     Serial.println(err);
-    return -1;
+    return -6;
   }
      
   int bodyLen = http.contentLength();
   if(bodyLen > 255) {          
     Serial.print("got way more content than we expected: ");
     Serial.println(bodyLen);
-    return -1;
+    return -7;
   }
-  
   char* body;
   body = (char*)malloc(bodyLen+1);
   body[bodyLen]=0;
   
   char* bodyP = body;
-  
   unsigned long timeoutStart = millis();
   char next_byte;
-  
   while (
     (http.connected() || http.available()) &&
     ((millis() - timeoutStart) < kNetworkTimeout) &&
@@ -161,13 +175,13 @@ int checkin(const char* asciiID) {
           delay(kNetworkDelay);
       }
   }
-  
   Serial.print(body);
-  lcd.print(body);
   
+  numToday = atoi(body);
+  
+  http.stop(); 
   free(body);
-  http.stop();   
-  return http.contentLength();
+  return 0;
 }
 
 void loop()
@@ -204,11 +218,13 @@ void loop()
   if( rfid.read() != checksum ) {
     Serial.print("Checksum failed: ");
     Serial.println(checksum);
+    failure_tone();
     goto freerfiddata;
   }
   
   if( rfid.read() != 0xbb ) {
     Serial.println("expected end of text marker");
+    failure_tone();
     goto freerfiddata;
   }
   
@@ -253,16 +269,23 @@ void loop()
       
       scan_tone();
       lcd.clear();
-      lcd.print("HI!");
-      lcd.setCursor(0,1);
+      lcd.print("Hi ");
       lcd.print(asciiID);
-      lcd.setCursor(0,2);
+      lcd.print("!");
+      lcd.setCursor(0,1);
+      lcd.print("Sending...");
       int result = checkin(asciiID);
       Serial.println(asciiID);
       
-      if(result == -1) {
+      lcd.setCursor(0,2);
+      if(result < 0) {
+        lcd.print("Failure :(");
+        lcd.setCursor(0,3);
+        lcd.print("Error code ");
+        lcd.print(result);
         failure_tone();
       } else {
+        lcd.print("Success!");
         success_tone();
       }
       

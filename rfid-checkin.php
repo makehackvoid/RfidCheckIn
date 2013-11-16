@@ -5,6 +5,7 @@ include('adodb5/adodb.inc.php');
 $db = NewADOConnection('mysql');
 $db->Connect("localhost", "checkin", "weeeeee", "rfidcheckin");
 if (!$db) {
+    header("Internal Server Error", true, 500);
     echo "Failed to connect to MySQL.\n";
     exit;
 }
@@ -18,11 +19,11 @@ if(array_key_exists('id',$_GET) and strlen($_GET['id']) == 12 ) {
     ) {
         $res = $db->Execute("select dayofyear(timestamp) as day, id from log where dayofyear(timestamp) = dayofyear(now()) group by id;");
 
-        print "OK\n";
+    	header("OK", true, 200);
         print $res->RecordCount();
-        print "\n";
     } else {
-        print "ERR\n2\n";
+        header("Internal Server Error", true, 500);
+        print "Error inserting checkin to database";
     }
 } else if(array_key_exists('report',$_GET)) {
     switch( $_GET['report'] ) {
@@ -51,5 +52,6 @@ if(array_key_exists('id',$_GET) and strlen($_GET['id']) == 12 ) {
         break;
     }
 } else {
-    print "ERR\n1\n";
+	header("Bad Request", true, 400);
+    print "Error invalid request";
 }
