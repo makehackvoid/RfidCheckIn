@@ -29,10 +29,32 @@ byte idle[2] = {0x01, 0x83};
 
 #define rxPin 2
 #define txPin 3
+#define buzzerPin 14 // Analog 0
 SoftwareSerial rfid( rxPin, txPin );
 
 #include <LiquidCrystal.h>
 LiquidCrystal lcd(4, 5, 6, 7, 8, 9);
+
+void scan_tone() {
+  tone(buzzerPin, 1976, 150); // B6
+  delay(150);
+}
+
+void success_tone() {
+  tone(buzzerPin, 2093, 100); // C7
+  delay(100);                
+  tone(buzzerPin, 2637, 100); // E7
+  delay(100);                
+  tone(buzzerPin, 3136, 100); // G7
+  delay(100);               
+  tone(buzzerPin, 3951, 150); // B7
+}
+
+void failure_tone() {
+  tone(buzzerPin, 1760, 150); // A6
+  delay(200);  
+  tone(buzzerPin, 880, 300); // A5
+}
 
 void reset_lcd() {
     lcd.clear();
@@ -45,6 +67,7 @@ void reset_lcd() {
 
 void setup() 
 {
+  scan_tone();
   Serial.begin(115200);
   Serial.println("Starting the RFID Checkin thing");
   
@@ -90,7 +113,6 @@ int checkin(const char* asciiID) {
     free(path);
     Serial.print("Connect failed: ");
     Serial.println(err);
-    lcd.print("ERROR!");
     return -1;
   }
   
@@ -99,20 +121,20 @@ int checkin(const char* asciiID) {
   if( err = http.responseStatusCode() < 0){          
     Serial.print("Getting response failed: ");
     Serial.println(err);
-    lcd.print("ERROR!");
+    return -1;
   }
   
   if( err = http.skipResponseHeaders() < 0 ) {
     Serial.print("Failed to skip response headers: ");
     Serial.println(err);
-    lcd.print("ERROR!");
+    return -1;
   }
      
   int bodyLen = http.contentLength();
   if(bodyLen > 255) {          
     Serial.print("got way more content than we expected: ");
     Serial.println(bodyLen);
-    lcd.print("ERROR!");
+    return -1;
   }
   
   char* body;
@@ -169,6 +191,7 @@ void loop()
   if(!data ) {
     Serial.print("couldn't allocate memory: ");
     Serial.println(count);
+    failure_tone();
     goto vacuumbuffer;
   }
   
@@ -228,14 +251,21 @@ void loop()
         sprintf(asciiID,"%s%02x",asciiID,data[i]); 
       }
       
+      scan_tone();
       lcd.clear();
       lcd.print("HI!");
       lcd.setCursor(0,1);
       lcd.print(asciiID);
       lcd.setCursor(0,2);
-      checkin(asciiID);
-      
+      int result = checkin(asciiID);
       Serial.println(asciiID);
+      
+      if(result == -1) {
+        failure_tone();
+      } else {
+        success_tone();
+      }
+      
       free(asciiID);
       delay(1000);
     }
