@@ -1,9 +1,9 @@
 <?php
 
 header("content-type:text/plain");
-include('adodb5/adodb.inc.php');
+include('adodb/adodb.inc.php');
 $db = NewADOConnection('mysql');
-$db->Connect("localhost", "checkin", "weeeeee", "rfidcheckin");
+$db->Connect("10.0.0.5", "checkin", "weeeeee", "rfidcheckin");
 if (!$db) {
     header("Internal Server Error", true, 500);
     echo "Failed to connect to MySQL.\n";
