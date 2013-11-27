@@ -6,7 +6,7 @@
 #include <EthernetClient.h>
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xE0, 0xFE, 0xED };
-char server[] = "morphia.mhv";
+char server[] = "10.0.0.5";
 
 EthernetClient client;
 
